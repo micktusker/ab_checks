@@ -1,2 +1,2 @@
 # ab_checks
-Checks on antibody sequences
+Written PostgreSQL plpythonu extension
