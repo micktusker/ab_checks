@@ -10,6 +10,7 @@ SELECT
   END chain_type,
   sequence_md5,
   user_defined_functions.count_substrings(sequence_aa, 'C') cysteine_count,
+  user_defined_functions.count_substrings(sequence_aa, 'M') methionine_count,
   user_defined_functions.first_cysteine_position(sequence_aa),
   user_defined_functions.last_cysteine_position(sequence_aa),
   user_defined_functions.get_cdr_l1_sequence(sequence_aa) cdr_l1,
@@ -34,4 +35,3 @@ SELECT
   user_defined_functions.get_liability_doublet_info(cdr_h3) cdr_h3_liabilities
 FROM
   ab_checker.vw_extracted_cdrs;
-  
