@@ -1,3 +1,18 @@
+DROP TABLE IF EXISTS ab_checker.antibody_sequences;
+CREATE TABLE ab_checker.antibody_sequences(
+  aa_seq_md5 TEXT PRIMARY KEY,
+  external_identifier TEXT NOT NULL,
+  aa_seq TEXT,
+  aa_count INTEGER,
+  seq_mol_wt REAL,
+  cysteine_count INTEGER,
+  chain_type TEXT CHECK(chain_type IN('L', 'H')),
+  cdr_1 TEXT,
+  cdr_2 TEXT,
+  cdr_3 TEXT
+);
+
+
 CREATE OR REPLACE VIEW ab_checker.vw_extracted_cdrs AS
 SELECT
   sequence_id,
