@@ -180,3 +180,78 @@ $$
 LANGUAGE 'plpythonu'
 STABLE
 SECURITY DEFINER;
+
+DROP FUNCTION IF EXISTS user_defined_functions.load_ab_aa_seq(TEXT, TEXT);
+CREATE OR REPLACE FUNCTION user_defined_functions.load_ab_aa_seq(p_external_identifier TEXT, p_aa_seq TEXT)
+RETURNS TABLE(aa_seq_md5 TEXT, external_identifier TEXT, aa_seq TEXT, aa_count INTEGER, seq_mol_wt REAL, cysteine_count INTEGER, 
+			chain_type TEXT, cdr_1 TEXT, cdr_2 TEXT, cdr_3 TEXT)
+AS
+$$
+DECLARE
+  l_aa_seq_md5 TEXT := MD5(p_aa_seq);
+  l_aa_seq TEXT := UPPER(TRIM(p_aa_seq));
+  l_aa_count INTEGER := LENGTH(l_aa_seq);
+  l_seq_mol_wt REAL := user_defined_functions.get_sequence_molecular_weight(l_aa_seq);
+  l_cysteine_count INTEGER := user_defined_functions.count_substrings(l_aa_seq, 'C');
+  l_chain_type TEXT;
+  l_cdr1 TEXT;
+  l_cdr2 TEXT;
+  l_cdr3 TEXT;
+BEGIN
+  IF l_aa_seq ~ 'TVSS$' THEN
+    l_chain_type := 'H';
+	l_cdr1 := user_defined_functions.get_cdr_h1_sequence(l_aa_seq);
+	l_cdr3 := user_defined_functions.get_cdr_h3_sequence(l_aa_seq);
+	l_cdr2 := user_defined_functions.get_cdr_h2_sequence(l_aa_seq, l_cdr1, l_cdr3);
+  ELSIF l_aa_seq ~ 'EIK$' THEN
+    l_chain_type := 'L';
+	l_cdr1 := user_defined_functions.get_cdr_l1_sequence(l_aa_seq);
+	l_cdr2 := user_defined_functions.get_cdr_l2_sequence(l_aa_seq, l_cdr1);
+	l_cdr3 := user_defined_functions.get_cdr_l3_sequence(l_aa_seq);
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM ab_checker.antibody_sequences ab_seqs WHERE ab_seqs.aa_seq_md5 = l_aa_seq_md5) THEN
+    INSERT INTO ab_checker.antibody_sequences(aa_seq_md5, 
+											external_identifier, 
+											aa_seq, 
+											aa_count, 
+											seq_mol_wt, 
+											cysteine_count, 
+											chain_type, 
+											cdr_1, 
+											cdr_2, 
+											cdr_3)
+											VALUES(l_aa_seq_md5, 
+												p_external_identifier, 
+												l_aa_seq, 
+												l_aa_count, 
+												l_seq_mol_wt, 
+												l_cysteine_count, 
+												l_chain_type, 
+												l_cdr1, 
+												l_cdr2, 
+												l_cdr3);
+  END IF;
+  RETURN QUERY
+  SELECT 
+    l_aa_seq_md5,
+	p_external_identifier,
+	l_aa_seq, 
+	l_aa_count, 
+	l_seq_mol_wt, 
+	l_cysteine_count, 
+	l_chain_type,
+	l_cdr1,
+	l_cdr2,
+	l_cdr3;
+END;
+$$
+LANGUAGE plpgsql
+VOLATILE 
+SECURITY DEFINER;
+
+SELECT aa_seq_md5, external_identifier, aa_seq, aa_count, seq_mol_wt, cysteine_count, chain_type, cdr_1, cdr_2, cdr_3
+FROM
+  user_defined_functions.load_ab_aa_seq('AB_H1', 'QVQLVQSGAEVKKPGASVKVSCKASGYTFTGYYMHWVRQAPGQGLEWMGSINPNSGGTNYAQKFQGRVTMTRDTSISTAYMELSRLRSDDTAVYYCARDGLMDVWGQGTAVTVSS');
+
+
+
