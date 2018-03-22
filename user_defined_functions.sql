@@ -36,7 +36,7 @@ RETURNS TEXT
 AS
 $$
 	import re
-	re_match = re.search('C(.+)?W[YLF][QL]', p_sequence_aa)
+	re_match = re.search('C(.{10,})?W.[QL]', p_sequence_aa)
 	if re_match:
 		return re_match.groups()[0]
 	else:
@@ -181,15 +181,16 @@ LANGUAGE 'plpythonu'
 STABLE
 SECURITY DEFINER;
 
-DROP FUNCTION IF EXISTS user_defined_functions.load_ab_aa_seq(TEXT, TEXT);
-CREATE OR REPLACE FUNCTION user_defined_functions.load_ab_aa_seq(p_external_identifier TEXT, p_aa_seq TEXT)
-RETURNS TABLE(aa_seq_md5 TEXT, external_identifier TEXT, aa_seq TEXT, aa_count INTEGER, seq_mol_wt REAL, cysteine_count INTEGER, 
+DROP FUNCTION IF EXISTS user_defined_functions.load_ab_aa_seq(TEXT, TEXT, TEXT);
+CREATE OR REPLACE FUNCTION user_defined_functions.load_ab_aa_seq(p_external_identifier TEXT, p_aa_seq TEXT, p_ab_target TEXT)
+RETURNS TABLE(aa_seq_md5 TEXT, external_identifier TEXT, aa_seq TEXT, ab_target TEXT, aa_count INTEGER, seq_mol_wt REAL, cysteine_count INTEGER, 
 			chain_type TEXT, cdr_1 TEXT, cdr_2 TEXT, cdr_3 TEXT)
 AS
 $$
 DECLARE
   l_aa_seq_md5 TEXT := MD5(p_aa_seq);
-  l_aa_seq TEXT := UPPER(TRIM(p_aa_seq));
+  l_aa_seq TEXT := user_defined_functions.get_valid_amino_acid_sequence(p_aa_seq);
+  l_ab_target TEXT := UPPER(TRIM(p_ab_target));
   l_aa_count INTEGER := LENGTH(l_aa_seq);
   l_seq_mol_wt REAL := user_defined_functions.get_sequence_molecular_weight(l_aa_seq);
   l_cysteine_count INTEGER := user_defined_functions.count_substrings(l_aa_seq, 'C');
@@ -212,8 +213,9 @@ BEGIN
   IF NOT EXISTS(SELECT 1 FROM ab_checker.antibody_sequences ab_seqs WHERE ab_seqs.aa_seq_md5 = l_aa_seq_md5) THEN
     INSERT INTO ab_checker.antibody_sequences(aa_seq_md5, 
 											external_identifier, 
-											aa_seq, 
-											aa_count, 
+											aa_seq,
+											ab_target,
+											aa_count,
 											seq_mol_wt, 
 											cysteine_count, 
 											chain_type, 
@@ -222,7 +224,8 @@ BEGIN
 											cdr_3)
 											VALUES(l_aa_seq_md5, 
 												p_external_identifier, 
-												l_aa_seq, 
+												l_aa_seq,
+												l_ab_target,
 												l_aa_count, 
 												l_seq_mol_wt, 
 												l_cysteine_count, 
@@ -235,7 +238,8 @@ BEGIN
   SELECT 
     l_aa_seq_md5,
 	p_external_identifier,
-	l_aa_seq, 
+	l_aa_seq,
+	l_ab_target,
 	l_aa_count, 
 	l_seq_mol_wt, 
 	l_cysteine_count, 
@@ -249,9 +253,47 @@ LANGUAGE plpgsql
 VOLATILE 
 SECURITY DEFINER;
 
-SELECT aa_seq_md5, external_identifier, aa_seq, aa_count, seq_mol_wt, cysteine_count, chain_type, cdr_1, cdr_2, cdr_3
+SELECT *
 FROM
-  user_defined_functions.load_ab_aa_seq('AB_H1', 'QVQLVQSGAEVKKPGASVKVSCKASGYTFTGYYMHWVRQAPGQGLEWMGSINPNSGGTNYAQKFQGRVTMTRDTSISTAYMELSRLRSDDTAVYYCARDGLMDVWGQGTAVTVSS');
+  user_defined_functions.load_ab_aa_seq('AB_H1', 'DIVMTQSPDSLAVSLGERATMSCKSSQSLLYSSNQKNYLAWHQQKPGQPPKLLIYWASTRESGVPDRFSGS GSGTDFTLTISSLQAEDLAIYYCQQYYTYPLTFGAGTKLEIK ', 'BAG3');
 
+CREATE OR REPLACE FUNCTION user_defined_functions.get_valid_amino_acid_sequence(p_aa_seq TEXT)
+RETURNS TEXT
+AS
+$$
+	from Bio.Data import IUPACData
+	import re
+	if p_aa_seq == None: return None
+	aa_seq = p_aa_seq.upper()
+	aa_seq = re.sub(r'\s+', '', aa_seq)
+	allowed_aa_set = set(list(IUPACData.protein_letters))
+	given_sequence_aa_set = set(list(aa_seq))
+	non_aa_set = given_sequence_aa_set - allowed_aa_set
+	if len(non_aa_set) > 0: raise Exception('Given sequence contains non amino acid characters!')
+	return aa_seq
+$$
+LANGUAGE 'plpythonu'
+STABLE
+SECURITY DEFINER;
+SELECT * FROM user_defined_functions.get_valid_amino_acid_sequence(' ac gt ');
 
+DROP FUNCTION user_defined_functions.get_potential_aa_liabilty_info(TEXT);
+CREATE OR REPLACE FUNCTION user_defined_functions.get_potential_aa_liabilty_info(p_aa_seq TEXT)
+RETURNS TEXT[]
+AS
+$$
+	aa_seq = str(plpy.execute("SELECT user_defined_functions.get_valid_amino_acid_sequence(%r)" % p_aa_seq))
+	liabilities_found = []
+	liabilities = ['NG', 'NM', 'NS', 'NT', 'DG', 'DS', 'DT', 'DD', 'DM', 'M', 'C']
+	for liability in liabilities:
+		if aa_seq.count(liability) > 0:
+			liabilities_found.append(liability + ': ' + str(aa_seq.count(liability)))
+	return liabilities_found
+$$
+LANGUAGE 'plpythonu'
+STABLE
+SECURITY DEFINER;
 
+SELECT *
+FROM
+  user_defined_functions.get_potential_aa_liabilty_info('DIVMTQSPDSLAVSLGERATMSCKSSQSLLYSSNQKNYLAWHQQKPGQPPKLLIYWASTRESGVPDRFSGS GSGTDFTLTISSLQAEDLAIYYCQQYYTYPLTFGAGTKLEIK');
