@@ -3,6 +3,7 @@ CREATE TABLE ab_checker.antibody_sequences(
   aa_seq_md5 TEXT PRIMARY KEY,
   external_identifier TEXT NOT NULL,
   aa_seq TEXT,
+  ab_target TEXT,
   aa_count INTEGER,
   seq_mol_wt REAL,
   cysteine_count INTEGER,
