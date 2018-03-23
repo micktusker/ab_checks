@@ -297,3 +297,24 @@ SECURITY DEFINER;
 SELECT *
 FROM
   user_defined_functions.get_potential_aa_liabilty_info('DIVMTQSPDSLAVSLGERATMSCKSSQSLLYSSNQKNYLAWHQQKPGQPPKLLIYWASTRESGVPDRFSGS GSGTDFTLTISSLQAEDLAIYYCQQYYTYPLTFGAGTKLEIK');
+
+CREATE OR REPLACE FUNCTION user_defined_functions.get_cdr_liabilities(p_uniq_ab_id TEXT, p_cdr_name TEXT, p_cdr_seq TEXT)
+RETURNS JSONB
+AS
+$$
+DECLARE
+  l_summary TEXT;
+  l_liabilities TEXT[] := user_defined_functions.get_potential_aa_liabilty_info(p_cdr_seq);
+BEGIN
+  l_summary := FORMAT('{"cdr_name": "%s", "uniq_ab_id": "%s", "liabilities": [%s]}', 
+					p_cdr_name, p_uniq_ab_id, '"' || 
+					(ARRAY_TO_STRING(l_liabilities, '","')) || '"');
+  RETURN l_summary::JSONB;
+END
+$$
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER;
+SELECT * FROM user_defined_functions.get_cdr_liabilities('ab_xyz', 'cdr_l1', 'GMTFCSSLACIF');
+
+  
