@@ -10,7 +10,8 @@ CREATE TABLE ab_checker.antibody_sequences(
   chain_type TEXT CHECK(chain_type IN('L', 'H')),
   cdr_1 TEXT,
   cdr_2 TEXT,
-  cdr_3 TEXT
+  cdr_3 TEXT,
+  uniq_ab_id TEXT
 );
 
 
@@ -51,3 +52,21 @@ SELECT
   user_defined_functions.get_liability_doublet_info(cdr_h3) cdr_h3_liabilities
 FROM
   ab_checker.vw_extracted_cdrs;
+  
+CREATE OR REPLACE VIEW ab_checker.vw_duplicated_full_ab_seqs AS
+SELECT *
+FROM
+  ab_checker.tusk_antibodies
+WHERE
+  uniq_ab_id
+  IN
+  (SELECT
+
+     uniq_ab_id
+   FROM
+     ab_checker.tusk_antibodies
+   GROUP BY
+     uniq_ab_id
+   HAVING
+     COUNT(source_sheet_id) > 1);
+  
