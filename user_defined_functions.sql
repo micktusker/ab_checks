@@ -317,4 +317,40 @@ STABLE
 SECURITY DEFINER;
 SELECT * FROM user_defined_functions.get_cdr_liabilities('ab_xyz', 'cdr_l1', 'GMTFCSSLACIF');
 
-  
+CREATE OR REPLACE FUNCTION user_defined_functions.make_full_ab_id(p_full_l_chain_aa TEXT, p_full_h_chain_aa TEXT)
+RETURNS TEXT
+AS
+$$
+DECLARE
+  l_full_l_chain_aa TEXT := REGEXP_REPLACE(UPPER(p_full_l_chain_aa), '\s', '', 'g');
+  l_full_h_chain_aa TEXT := REGEXP_REPLACE(UPPER(p_full_h_chain_aa), '\s', '', 'g');
+BEGIN
+  RETURN MD5(l_full_l_chain_aa || l_full_h_chain_aa);
+END;
+$$
+LANGUAGE plpgsql
+IMMUTABLE
+SECURITY DEFINER
+RETURNS NULL ON NULL INPUT;
+
+CREATE OR REPLACE FUNCTION user_defined_functions.get_pattern_location_info(p_text_to_search TEXT, p_pattern TEXT)
+RETURNS JSONB
+AS
+$$
+	import re
+	import json
+	pattern_location_matches = []
+	match_info = {}
+	for m in re.finditer(p_pattern, p_text_to_search):
+		match_info['start'] = m.start()
+		match_info['matched_text'] = m.group()
+		match_info['end'] = m.end()
+		pattern_location_matches.append(match_info)
+	return json.dumps(pattern_location_matches)
+$$
+LANGUAGE plpythonu
+IMMUTABLE
+SECURITY DEFINER
+RETURNS NULL ON NULL INPUT;
+SELECT * FROM user_defined_functions.get_pattern_location_info('MNFGLRLIFLVLTLKGVQCQVQLVQSGAEVKKPGA', 'V.T');
+
